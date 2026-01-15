@@ -69,39 +69,44 @@ const INITIAL_STATE: AppState = {
 
 const App: React.FC = () => {
   const [state, setState] = useState<AppState>(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    const parsed: AppState = saved ? JSON.parse(saved) : INITIAL_STATE;
-    
-    const todayStr = new Date().toISOString().split('T')[0];
-    
-    if (parsed.lastActiveDate !== todayStr) {
-      if (parsed.profile.level >= 8) {
-        const missedDrills = DRILLS.length - (parsed.completedDrills?.length || 0);
-        if (missedDrills > 0) {
-          parsed.profile.xp = Math.max(0, parsed.profile.xp - (missedDrills * 20));
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      const parsed: AppState = saved ? JSON.parse(saved) : INITIAL_STATE;
+      
+      const todayStr = new Date().toISOString().split('T')[0];
+      
+      if (parsed.lastActiveDate !== todayStr) {
+        if (parsed.profile.level >= 8) {
+          const missedDrills = DRILLS.length - (parsed.completedDrills?.length || 0);
+          if (missedDrills > 0) {
+            parsed.profile.xp = Math.max(0, parsed.profile.xp - (missedDrills * 20));
+          }
         }
+
+        const isNewWeek = new Date().getDay() === 1;
+        if (isNewWeek) {
+          parsed.novelHistory = [...(parsed.novelHistory || []), { weekEnding: parsed.lastActiveDate, minutes: parsed.novelMins, pages: parsed.novelPages }];
+          parsed.novelMins = 0;
+          parsed.novelPages = 0;
+          parsed.weeklyChallenges = null; 
+        }
+
+        parsed.completedDrills = [];
+        parsed.lastActiveDate = todayStr;
       }
 
-      const isNewWeek = new Date().getDay() === 1;
-      if (isNewWeek) {
-        parsed.novelHistory = [...(parsed.novelHistory || []), { weekEnding: parsed.lastActiveDate, minutes: parsed.novelMins, pages: parsed.novelPages }];
-        parsed.novelMins = 0;
-        parsed.novelPages = 0;
-        parsed.weeklyChallenges = null; 
-      }
+      // Migration safety
+      if (!parsed.weeklyScheduleTemplate) parsed.weeklyScheduleTemplate = INITIAL_SCHEDULE_TEMPLATE;
+      if (!parsed.events) parsed.events = [];
+      if (!parsed.exams) parsed.exams = [];
+      if (!parsed.future) parsed.future = INITIAL_FUTURE_DATA;
+      if (parsed.future && parsed.future.futureNotes === undefined) parsed.future.futureNotes = '';
 
-      parsed.completedDrills = [];
-      parsed.lastActiveDate = todayStr;
+      return parsed;
+    } catch (e) {
+      console.error("Failed to load state, resetting to initial", e);
+      return INITIAL_STATE;
     }
-
-    // Migration safety
-    if (!parsed.weeklyScheduleTemplate) parsed.weeklyScheduleTemplate = INITIAL_SCHEDULE_TEMPLATE;
-    if (!parsed.events) parsed.events = [];
-    if (!parsed.exams) parsed.exams = [];
-    if (!parsed.future) parsed.future = INITIAL_FUTURE_DATA;
-    if (parsed.future && parsed.future.futureNotes === undefined) parsed.future.futureNotes = '';
-
-    return parsed;
   });
 
   const [activeTab, setActiveTab] = useState<'home' | 'schedule' | 'exams' | 'future' | 'tasks' | 'challenges' | 'war' | 'creative' | 'stats' | 'profile'>('home');
